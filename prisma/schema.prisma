@@ -1,0 +1,672 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ══════════════════════════════════════════
+// طبقة 1 — مدير النظام والإعدادات العامة
+// ══════════════════════════════════════════
+
+model SuperAdmin {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// إعدادات المنصة العامة — صف واحد فقط (id ثابت "singleton")
+model PlatformSetting {
+  id                      String    @id @default("singleton")
+  maintenanceEnabled      Boolean   @default(false)
+  maintenanceMessage      String    @default("النظام تحت الصيانة، سنعود قريباً")
+  // maintenanceEndsAt: وقت الانتهاء المتوقع المعروض للمستخدم (اختياري، إعلامي فقط)
+  maintenanceEndsAt       DateTime?
+  // maintenanceActivatedAt + maintenanceGraceMinutes: يحسبان معاً لحظة قطع الجلسات النشطة (تُحسب في السيرفر دائماً، لا تعتمد على عداد المتصفح)
+  maintenanceActivatedAt  DateTime?
+  maintenanceGraceMinutes Int       @default(0)
+  updatedAt               DateTime  @updatedAt
+}
+
+model StoreType {
+  id          String   @id @default(cuid())
+  name        String
+  icon        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  stores Store[]
+}
+
+model Plan {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  prices        PlanPrice[]
+  subscriptions Subscription[]
+}
+
+// billingCycle: "MONTHLY" | "YEARLY"
+model PlanPrice {
+  id           String @id @default(cuid())
+  billingCycle String
+  minBranches  Int    @default(1)
+  maxBranches  Int?
+  priceUsd     Int
+  discountPct  Int    @default(0)
+
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  @@unique([planId, billingCycle, minBranches])
+}
+
+// ══════════════════════════════════════════
+// طبقة 2 — المتجر (Tenant)
+// ══════════════════════════════════════════
+
+model Store {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  phone     String?
+  address   String?
+  // taxRate: نقاط أساس (basis points) — 1500 = 15%. تُضرب في المبلغ ثم تُقسم على 10000.
+  taxRate     Int     @default(0)
+  taxEnabled  Boolean @default(false)
+  taxName     String  @default("ضريبة")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // صيانة/تعليق خاص بهذا المتجر فقط — حجب فوري بلا مهلة سماح، مستقل عن صيانة المنصة العامة
+  maintenanceMode    Boolean @default(false)
+  maintenanceMessage String?
+
+  allowEnglish Boolean @default(false)
+
+  // roundingRule: "100" | "500" | "1000" — تقريب إجمالي الفاتورة بالليرة السورية
+  roundingRule    String @default("500")
+  // pricingCurrency: "USD" | "SYP" — عملة إدخال أسعار المنتجات الجديدة
+  pricingCurrency String @default("USD")
+
+  storeTypeId String
+  storeType   StoreType @relation(fields: [storeTypeId], references: [id])
+
+  subscription Subscription?
+  branches     Branch[]
+  users        StoreUser[]
+  products     Product[]
+  categories   Category[]
+  customers    Customer[]
+  suppliers    Supplier[]
+  sales        Sale[]
+  saleReturns  SaleReturn[]
+  shifts       Shift[]
+  auditLogs    AuditLog[]
+  expenses     Expense[]
+  inventoryMovements InventoryMovement[]
+  exchangeRates      ExchangeRate[]
+  notifications      Notification[]
+}
+
+// سعر الصرف: كم ليرة سورية لكل دولار واحد. يُستخدم دائماً أحدث سجل — لا يُعدَّل سجل قديم، التحديث = إضافة سجل جديد.
+model ExchangeRate {
+  id            String   @id @default(cuid())
+  rate          Int
+  effectiveFrom DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id])
+
+  createdById String
+  createdBy   StoreUser @relation(fields: [createdById], references: [id])
+
+  @@index([storeId, effectiveFrom])
+}
+
+// status: "TRIAL" | "ACTIVE" | "EXPIRED" | "SUSPENDED" | "CANCELLED"
+// billingCycle: "MONTHLY" | "YEARLY"
+model Subscription {
+  id           String   @id @default(cuid())
+  status       String   @default("ACTIVE")
+  startDate    DateTime @default(now())
+  endDate      DateTime
+  autoRenew    Boolean  @default(false)
+  branchCount  Int      @default(1)
+  priceUsd     Int
+  notes        String?
+  billingCycle String
+
+  storeId String @unique
+  store   Store  @relation(fields: [storeId], references: [id])
+  planId  String
+  plan    Plan   @relation(fields: [planId], references: [id])
+
+  payments SubscriptionPayment[]
+  renewals SubscriptionRenewal[]
+}
+
+model SubscriptionPayment {
+  id              String   @id @default(cuid())
+  amountUsd       Int
+  method          String
+  referenceNumber String?
+  receiptUrl      String?
+  paidAt          DateTime @default(now())
+  notes           String?
+  confirmedBy     String?
+
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
+}
+
+// billingCycle: "MONTHLY" | "YEARLY"
+model SubscriptionRenewal {
+  id           String   @id @default(cuid())
+  fromDate     DateTime
+  toDate       DateTime
+  branchCount  Int
+  priceUsd     Int
+  billingCycle String
+  renewedAt    DateTime @default(now())
+
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
+}
+
+model Branch {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id])
+
+  users       StoreUser[]
+  shifts      Shift[]
+  sales       Sale[]
+  saleReturns SaleReturn[]
+  expenses    Expense[]
+  inventoryMovements InventoryMovement[]
+}
+
+// ══════════════════════════════════════════
+// طبقة 3 — مستخدمو المتجر
+// ══════════════════════════════════════════
+
+// role: "STORE_MANAGER" | "CASHIER"
+model StoreUser {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  password  String
+  role      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  storeId  String
+  store    Store   @relation(fields: [storeId], references: [id])
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id])
+
+  shifts             Shift[]
+  sales              Sale[]
+  saleReturns        SaleReturn[]
+  auditLogs          AuditLog[]
+  inventoryMovements InventoryMovement[]
+  expensesAsEmployee Expense[] @relation("ExpenseEmployee")
+  expensesCreated    Expense[] @relation("ExpenseCreator")
+  exchangeRatesSet   ExchangeRate[]
+
+  @@unique([email, storeId])
+}
+
+// ══════════════════════════════════════════
+// بيانات المتجر
+// ══════════════════════════════════════════
+
+model Product {
+  id            String   @id @default(cuid())
+  name          String
+  nameEn        String?
+  barcode       String?
+  price         Int
+  // priceCurrency: "USD" | "SYP" — تُخزن لحظة إنشاء/تعديل المنتج حسب إعداد pricingCurrency الساري وقتها.
+  // price وcostPrice يُفسَّران دائماً حسب هذا الحقل، وليس حسب إعداد المتجر الحالي.
+  priceCurrency String   @default("USD")
+  costPrice     Int      @default(0)
+  stock         Int      @default(0)
+  minStock      Int      @default(5)
+  // lowStockThreshold: حد التنبيه الاختياري لإشعار LOW_STOCK — منفصل عن minStock (المستخدم لتمييز "منخفض" في واجهة المنتجات). null = بلا تنبيه.
+  lowStockThreshold Int?
+  isActive      Boolean  @default(true)
+  hasDiscount   Boolean  @default(false)
+  discountType  String?
+  discountValue Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  storeId    String
+  store      Store     @relation(fields: [storeId], references: [id])
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  saleItems            SaleItem[]
+  saleReturnItems      SaleReturnItem[]
+  inventoryMovements   InventoryMovement[]
+  supplierInvoiceItems SupplierInvoiceItem[]
+
+  @@unique([storeId, barcode])
+}
+
+// type: "SALARY" | "ADVANCE" | "STORE"
+model Expense {
+  id        String   @id @default(cuid())
+  type      String
+  // amount بالليرة السورية دائماً (currency = "SYP" ثابتة حالياً)
+  amount    Int
+  currency  String   @default("SYP")
+  // exchangeRate وamountUsdCents يُحسبان لحظة تسجيل المصروف من أحدث سعر صرف — لا يعادان حسابهما لاحقاً
+  exchangeRate   Int?
+  amountUsdCents Int?
+  title     String?
+  notes     String?
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id])
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id])
+
+  employeeId String?
+  employee   StoreUser? @relation("ExpenseEmployee", fields: [employeeId], references: [id])
+
+  userId String
+  user   StoreUser @relation("ExpenseCreator", fields: [userId], references: [id])
+}
+
+model Category {
+  id      String @id @default(cuid())
+  name    String
+  nameEn  String?
+  color   String @default("#6366f1")
+
+  storeId  String
+  store    Store    @relation(fields: [storeId], references: [id])
+
+  products Product[]
+}
+
+// type: "CASH" | "CREDIT"
+// status: "COMPLETED" | "CANCELLED" | "REFUNDED"
+model Sale {
+  id            String   @id @default(cuid())
+  invoiceNumber String
+  type          String   @default("CASH")
+  status        String   @default("COMPLETED")
+  // subtotal/discount/tax/total/amountPaid/remaining كلها بالليرة السورية (عملة القبض الوحيدة في POS)
+  subtotal      Int
+  discount      Int      @default(0)
+  // tax: مبلغ الضريبة الإجمالي بالليرة، محسوب على الصافي بعد الخصومات. taxRateApplied/taxName: لقطة من إعداد المتجر لحظة البيع — لا تتغيران لاحقاً حتى لو عُدِّل الإعداد.
+  tax             Int    @default(0)
+  taxRateApplied  Int    @default(0)
+  taxName         String @default("ضريبة")
+  // المعادل الدولاري لمبلغ الضريبة (tax) — محسوب بسعر صرف الفاتورة نفسه، لفصل الضريبة عن الإيراد في التقارير
+  taxUsdCents     Int    @default(0)
+  total         Int
+  amountPaid    Int      @default(0)
+  remaining     Int      @default(0)
+  // سعر الصرف وقت البيع + القيمة المعادلة بالدولار — تُجمَّد لحظة البيع ولا تتغيران أبداً بعدها
+  exchangeRate    Int @default(0)
+  totalUsdCents   Int @default(0)
+  totalSyp        Int @default(0)
+  roundingDiffSyp Int @default(0)
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  storeId    String
+  store      Store     @relation(fields: [storeId], references: [id])
+  branchId   String
+  branch     Branch    @relation(fields: [branchId], references: [id])
+  userId     String
+  user       StoreUser @relation(fields: [userId], references: [id])
+  shiftId    String
+  shift      Shift     @relation(fields: [shiftId], references: [id])
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  items    SaleItem[]
+  payments Payment[]
+  returns  SaleReturn[]
+  inventoryMovements InventoryMovement[]
+
+  @@unique([storeId, invoiceNumber])
+}
+
+model SaleItem {
+  id        String @id @default(cuid())
+  quantity  Int
+  // unitPrice/total بالليرة السورية بعد التحويل من عملة المنتج الأصلية (priceCurrency snapshot)
+  unitPrice Int
+  discount  Int    @default(0)
+  total     Int
+  // netLineTotal = total ناقص حصة هذا السطر من خصم الفاتورة الإجمالي (Sale.discount)، موزّعة نسبياً حسب قيمة كل سطر لحظة البيع.
+  // هذا هو الرقم المرجعي الوحيد لما دفعه الزبون فعلاً مقابل هذا السطر قبل الضريبة — تُبنى عليه التقارير (الإيراد الصافي لا يشمل الضريبة).
+  netLineTotal Int @default(0)
+  // lineTax: حصة هذا السطر من ضريبة الفاتورة (Sale.tax)، موزّعة نسبياً حسب netLineTotal. المبلغ الفعلي الذي دفعه الزبون لهذا السطر = netLineTotal + lineTax.
+  // مرجعي للمرتجعات: المردود يجب أن يشمل هذا المبلغ حتى لا يُحرم الزبون من نصيبه من الضريبة عند الاسترجاع.
+  lineTax Int @default(0)
+  // priceCurrency: عملة سعر المنتج الأصلي لحظة البيع ("USD" | "SYP") — للتوثيق والفاتورة فقط
+  priceCurrency String @default("USD")
+
+  saleId    String
+  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  returnItems SaleReturnItem[]
+}
+
+// refundMethod: "CASH" | "CREDIT_NOTE"
+model SaleReturn {
+  id           String   @id @default(cuid())
+  returnNumber String
+  reason       String?
+  refundMethod String   @default("CASH")
+  // total بالليرة السورية — شامل نصيب الضريبة المرجَع (netLineTotal + lineTax نسبياً)، لأن الزبون يسترد ما دفعه فعلاً شاملاً الضريبة
+  total        Int
+  // taxSyp: حصة الضريبة من total أعلاه (بالليرة) — للتوثيق ولفصل الضريبة في التقارير
+  taxSyp       Int @default(0)
+  // القيمة المعادلة بالدولار محسوبة بسعر صرف الفاتورة الأصلية (sale.exchangeRate) لحظة الإرجاع — لا تتغير أبداً بعدها، وهذا ما تقرأه التقارير مباشرة
+  totalUsdCents Int @default(0)
+  totalSyp      Int @default(0)
+  // المعادل الدولاري لـ taxSyp — لطرح الضريبة المرجعة من "الضريبة المحصلة" في التقارير
+  taxUsdCents   Int @default(0)
+  createdAt    DateTime @default(now())
+
+  storeId    String
+  store      Store     @relation(fields: [storeId], references: [id])
+  branchId   String
+  branch     Branch    @relation(fields: [branchId], references: [id])
+  userId     String
+  user       StoreUser @relation(fields: [userId], references: [id])
+  saleId     String
+  sale       Sale      @relation(fields: [saleId], references: [id])
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  // الوردية التي جرى فيها الاسترجاع (وليس وردية البيع الأصلي) — تُستخدم لخصم الاسترجاع النقدي من صندوق هذه الوردية عند الإغلاق
+  shiftId    String?
+  shift      Shift?    @relation(fields: [shiftId], references: [id])
+
+  items SaleReturnItem[]
+
+  @@unique([storeId, returnNumber])
+}
+
+model SaleReturnItem {
+  id        String @id @default(cuid())
+  quantity  Int
+  unitPrice Int
+  // total = نصيب الكمية المرجعة من (netLineTotal + lineTax) — شامل الضريبة. taxRefund: حصة الضريبة وحدها من total (توثيق/تقارير).
+  total     Int
+  taxRefund Int @default(0)
+
+  saleReturnId String
+  saleReturn   SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  saleItemId   String
+  saleItem     SaleItem   @relation(fields: [saleItemId], references: [id])
+  productId    String
+  product      Product    @relation(fields: [productId], references: [id])
+}
+
+model Payment {
+  id     String   @id @default(cuid())
+  amount Int
+  method String
+  date   DateTime @default(now())
+
+  saleId String
+  sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+}
+
+// status: "OPEN" | "CLOSED"
+model Shift {
+  id           String    @id @default(cuid())
+  status       String    @default("OPEN")
+  openedAt     DateTime  @default(now())
+  closedAt     DateTime?
+  openingCash  Int       @default(0)
+  expectedCash Int       @default(0)
+  actualCash   Int?
+  difference   Int?
+  notes        String?
+
+  storeId  String
+  store    Store     @relation(fields: [storeId], references: [id])
+  branchId String
+  branch   Branch    @relation(fields: [branchId], references: [id])
+  userId   String
+  user     StoreUser @relation(fields: [userId], references: [id])
+
+  sales       Sale[]
+  saleReturns SaleReturn[]
+}
+
+// creditLimit وcurrentBalance بالدولار (سنتات) دائماً
+model Customer {
+  id             String   @id @default(cuid())
+  name           String
+  phone          String?
+  address        String?
+  creditLimit    Int      @default(0)
+  currentBalance Int      @default(0)
+  // debtLimitUsdCents: سقف دين اختياري لإشعار CUSTOMER_DEBT_LIMIT — منفصل عن creditLimit التجاري. null = بلا سقف تنبيه.
+  debtLimitUsdCents Int?
+  createdAt      DateTime @default(now())
+
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id])
+
+  sales    Sale[]
+  returns  SaleReturn[]
+  payments CustomerPayment[]
+}
+
+// amount بالدولار (سنتات): موجب = العميل سدد ديناً، سالب = المتجر سدد رصيداً للعميل
+// exchangeRate: سعر الصرف الساري لحظة الدفعة — للتوثيق فقط، لا يدخل في أي حساب
+model CustomerPayment {
+  id           String   @id @default(cuid())
+  amount       Int
+  currency     String   @default("USD")
+  exchangeRate Int?
+  method       String   @default("CASH")
+  notes        String?
+  date         DateTime @default(now())
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+}
+
+// currentBalance بالدولار (سنتات) دائماً
+model Supplier {
+  id             String   @id @default(cuid())
+  name           String
+  phone          String?
+  address        String?
+  currentBalance Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  storeId  String
+  store    Store   @relation(fields: [storeId], references: [id])
+
+  invoices SupplierInvoice[]
+}
+
+// كل المبالغ بالدولار (سنتات) — currency ثابتة "USD" حالياً
+model SupplierInvoice {
+  id            String   @id @default(cuid())
+  invoiceNumber String
+  date          DateTime @default(now())
+  total         Int
+  currency      String   @default("USD")
+  amountPaid    Int      @default(0)
+  remaining     Int
+  status        String   @default("UNPAID")
+  // dueDate: تاريخ استحقاق اختياري — يُستخدم لإشعار SUPPLIER_INVOICE_DUE. null = بلا تاريخ استحقاق محدد.
+  dueDate       DateTime?
+
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+
+  items    SupplierInvoiceItem[]
+  payments SupplierPayment[]
+  inventoryMovements InventoryMovement[]
+}
+
+model SupplierInvoiceItem {
+  id       String @id @default(cuid())
+  quantity Int
+  unitCost Int
+  total    Int
+
+  supplierInvoiceId String
+  supplierInvoice   SupplierInvoice @relation(fields: [supplierInvoiceId], references: [id], onDelete: Cascade)
+  productId         String
+  product           Product         @relation(fields: [productId], references: [id])
+}
+
+model SupplierPayment {
+  id       String   @id @default(cuid())
+  amount   Int
+  currency String   @default("USD")
+  date     DateTime @default(now())
+  notes    String?
+
+  supplierInvoiceId String
+  supplierInvoice   SupplierInvoice @relation(fields: [supplierInvoiceId], references: [id], onDelete: Cascade)
+}
+
+// type: "SALE" | "SALE_RETURN" | "PURCHASE" | "ADJUSTMENT" | "DAMAGE"
+// quantity: موجب = زيادة بالمخزون، سالب = نقص
+model InventoryMovement {
+  id            String   @id @default(cuid())
+  type          String
+  quantity      Int
+  quantityAfter Int
+  note          String?
+  createdAt     DateTime @default(now())
+
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id])
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id])
+
+  storeUserId String
+  storeUser   StoreUser @relation(fields: [storeUserId], references: [id])
+
+  saleId String?
+  sale   Sale?   @relation(fields: [saleId], references: [id])
+
+  supplierInvoiceId String?
+  supplierInvoice   SupplierInvoice? @relation(fields: [supplierInvoiceId], references: [id])
+
+  @@index([storeId, createdAt])
+  @@index([productId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  resource   String
+  resourceId String?
+  oldData    String?
+  newData    String?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  storeId String?
+  store   Store?     @relation(fields: [storeId], references: [id])
+  userId  String?
+  user    StoreUser? @relation(fields: [userId], references: [id])
+}
+
+// type: "LOW_STOCK" | "STALE_EXCHANGE_RATE" | "CUSTOMER_DEBT_LIMIT" | "SUPPLIER_INVOICE_DUE" | "SHIFT_DIFFERENCE" | "SUBSCRIPTION_EXPIRING"
+//     | "BACKUP_STALE" | "DISK_SPACE_LOW" | "HIGH_ERROR_RATE" | "DB_SIZE_WARNING"
+// targetRole: "MANAGER" | "SUPER_ADMIN"
+// severity: "INFO" | "WARNING" | "CRITICAL"
+// storeId: فارغ لتنبيهات منصّة-مستوى (targetRole = SUPER_ADMIN) — قاعدة البيانات واحدة مشتركة، فهذه التنبيهات لا تخص متجراً بعينه
+// referenceKey: مفتاح منع التكرار للحالات المستمرة (مثال: "LOW_STOCK:productId") — إشعار واحد غير مقروء فقط لكل مفتاح.
+// الأحداث اللحظية (SHIFT_DIFFERENCE) بلا referenceKey — كل حدث إشعار مستقل.
+model Notification {
+  id           String   @id @default(cuid())
+  type         String
+  title        String
+  body         String
+  link         String?
+  targetRole   String   @default("MANAGER")
+  severity     String   @default("INFO")
+  isRead       Boolean  @default(false)
+  referenceKey String?
+  createdAt    DateTime @default(now())
+
+  storeId String?
+  store   Store?  @relation(fields: [storeId], references: [id])
+
+  @@index([storeId, isRead, createdAt])
+  @@index([storeId, referenceKey, isRead])
+  @@index([targetRole, isRead, createdAt])
+}
+
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  email     String
+  ip        String?
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+}
+
+// type: يمثل غالباً اسم الخطأ (Error.name) أو "ZodValidation" — للتصنيف بصفحة سجل الأخطاء
+// statusCode: كود الاستجابة الفعلي المُعاد للعميل (401/403/422/500...) — يسمح بالفلترة
+// storeId/userId: null إن تعذّر تحديد الجلسة (خطأ قبل نجاح المصادقة)
+model ErrorLog {
+  id         String   @id @default(cuid())
+  type       String
+  message    String
+  stackTrace String?
+  apiRoute   String
+  method     String
+  statusCode Int
+  storeId    String?
+  userId     String?
+  userAgent  String?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([storeId, createdAt])
+  @@index([statusCode, createdAt])
+}

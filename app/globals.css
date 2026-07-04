@@ -1,0 +1,272 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+@theme inline {
+  --color-background:           hsl(var(--background));
+  --color-foreground:           hsl(var(--foreground));
+  --color-card:                 hsl(var(--card));
+  --color-card-foreground:      hsl(var(--card-foreground));
+  --color-popover:              hsl(var(--popover));
+  --color-popover-foreground:   hsl(var(--popover-foreground));
+  --color-primary:              hsl(var(--primary));
+  --color-primary-foreground:   hsl(var(--primary-foreground));
+  --color-secondary:            hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted:                hsl(var(--muted));
+  --color-muted-foreground:     hsl(var(--muted-foreground));
+  --color-accent:               hsl(var(--accent));
+  --color-accent-foreground:    hsl(var(--accent-foreground));
+  --color-destructive:          hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border:               hsl(var(--border));
+  --color-input:                hsl(var(--input));
+  --color-ring:                 hsl(var(--ring));
+  --radius:                     0.625rem;
+}
+
+@layer base {
+  :root {
+    /* ─── shadcn/ui — primary: indigo ─── */
+    --background:             220 14% 96%;
+    --foreground:             224 32% 16%;
+    --card:                   0 0% 100%;
+    --card-foreground:        224 32% 16%;
+    --popover:                0 0% 100%;
+    --popover-foreground:     224 32% 16%;
+    --primary:                239 84% 60%;
+    --primary-foreground:     0 0% 100%;
+    --secondary:              220 14% 96%;
+    --secondary-foreground:   224 32% 16%;
+    --muted:                  220 14% 96%;
+    --muted-foreground:       215 16% 47%;
+    --accent:                 239 84% 60%;
+    --accent-foreground:      0 0% 100%;
+    --destructive:            0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border:                 220 13% 91%;
+    --input:                  220 13% 91%;
+    --ring:                   239 84% 60%;
+
+    /* ─── Brand — Indigo + Blue ─── */
+    --indigo:   #4f46e5;
+    --indigo-h: #4338ca;
+    --indigo-l: rgba(79,70,229,0.12);
+    --indigo-g: rgba(79,70,229,0.07);
+    --blue:     #2563eb;
+    --blue-h:   #1d4ed8;
+    --blue-l:   rgba(37,99,235,0.12);
+
+    /* ─── Sidebar ─── */
+    --mirage:       #0f172a;
+    --mirage-light: #1e293b;
+
+    /* ─── Page & Surfaces ─── */
+    --diamond: #f1f5f9;
+    --white:   #ffffff;
+    --surface: #ffffff;
+
+    /* ─── Borders ─── */
+    --border-color: #e2e8f0;
+    --border-l:     #f1f5f9;
+
+    /* ─── Text ─── */
+    --text:   #1e293b;
+    --text-2: #64748b;
+    --text-m: #94a3b8;
+
+    /* ─── Status colors ─── */
+    --green:  #10b981;
+    --red:    #ef4444;
+    --amber:  #f59e0b;
+    --info:   #3b82f6;
+    --purple: #8b5cf6;
+    --orange: #f97316;
+    --pink:   #ec4899;
+    --teal:   #14b8a6;
+
+    /* ─── Status backgrounds (light) ─── */
+    --green-bg:  #ecfdf5;
+    --red-bg:    #fef2f2;
+    --amber-bg:  #fffbeb;
+    --blue-bg:   #eff6ff;
+    --purple-bg: #f5f3ff;
+    --orange-bg: #fff7ed;
+    --pink-bg:   #fdf2f8;
+    --teal-bg:   #f0fdfa;
+
+    /* ─── Shadows ─── */
+    --sh:   0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.04);
+    --sh-m: 0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px -2px rgba(0,0,0,.04);
+    --sh-l: 0 10px 25px -5px rgba(0,0,0,.10), 0 8px 10px -6px rgba(0,0,0,.04);
+
+    /* ─── Compact radii ─── */
+    --r:   10px;
+    --r-s:  8px;
+    --r-x:  6px;
+
+    /* ─── Layout ─── */
+    --sw:  230px;
+    --th:   48px;
+
+    /* ─── Typography ─── */
+    --f:    'IBM Plex Sans Arabic', 'IBM Plex Sans', -apple-system, sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+  }
+
+  .dark {
+    --background:             224 32% 8%;
+    --foreground:             215 46% 93%;
+    --card:                   224 24% 11%;
+    --card-foreground:        215 46% 93%;
+    --popover:                224 24% 11%;
+    --popover-foreground:     215 46% 93%;
+    --primary:                239 84% 65%;
+    --primary-foreground:     0 0% 100%;
+    --secondary:              224 24% 11%;
+    --secondary-foreground:   215 46% 93%;
+    --muted:                  224 24% 11%;
+    --muted-foreground:       215 11% 55%;
+    --accent:                 239 84% 65%;
+    --accent-foreground:      0 0% 100%;
+    --destructive:            0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border:                 224 20% 20%;
+    --input:                  224 20% 20%;
+    --ring:                   239 84% 65%;
+
+    --diamond: #0d1117;
+    --white:   #161b22;
+    --surface: #161b22;
+    --border-color: #21262d;
+    --border-l:     #1a1f2e;
+    --text:   #e6edf3;
+    --text-2: #8b949e;
+    --text-m: #545d68;
+    --indigo:   #6366f1;
+    --indigo-h: #4f46e5;
+    --indigo-l: rgba(99,102,241,0.15);
+    --indigo-g: rgba(99,102,241,0.08);
+
+    --green-bg:  rgba(16,185,129,0.12);
+    --red-bg:    rgba(239,68,68,0.12);
+    --amber-bg:  rgba(245,158,11,0.12);
+    --blue-bg:   rgba(59,130,246,0.12);
+    --purple-bg: rgba(139,92,246,0.12);
+    --orange-bg: rgba(249,115,22,0.12);
+    --pink-bg:   rgba(236,72,153,0.12);
+    --teal-bg:   rgba(20,184,166,0.12);
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--f);
+    font-size: 14px;
+  }
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar        { width: 5px; height: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--text-m); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-2); }
+
+/* ─── Status icon boxes ─── */
+.st-ico.blue   { background: var(--blue-bg);   color: var(--info); }
+.st-ico.indigo { background: var(--indigo-g);  color: var(--indigo); }
+.st-ico.green  { background: var(--green-bg);  color: var(--green); }
+.st-ico.red    { background: var(--red-bg);    color: var(--red); }
+.st-ico.amber  { background: var(--amber-bg);  color: var(--amber); }
+.st-ico.purple { background: var(--purple-bg); color: var(--purple); }
+.st-ico.orange { background: var(--orange-bg); color: var(--orange); }
+.st-ico.teal   { background: var(--teal-bg);   color: var(--teal); }
+.st-ico.pink   { background: var(--pink-bg);   color: var(--pink); }
+
+/* ─── Toasts ─── */
+.toast         { background: var(--mirage); color:#fff; border-right:3px solid var(--indigo); border-radius: var(--r-s); }
+.toast.success { border-color: var(--green); }
+.toast.error   { border-color: var(--red);   }
+.toast.warning { border-color: var(--amber); }
+.toast.info    { border-color: var(--info);  }
+
+/* ─── Utility button classes ─── */
+.btn-primary {
+  background: var(--indigo); color:#fff; border-radius: var(--r-s);
+  padding: 8px 16px; font-size:14px; font-weight:500; border:none; cursor:pointer;
+  transition: background .15s, box-shadow .15s; display:inline-flex; align-items:center; gap:6px; min-height:36px;
+  font-family: var(--f);
+}
+.btn-primary:hover  { background: var(--indigo-h); box-shadow: var(--sh-m); }
+.btn-primary:active { opacity:.9; }
+
+.btn-outline {
+  background:transparent; color:var(--text); border:1px solid var(--border-color); border-radius: var(--r-s);
+  padding:7px 14px; font-size:14px; font-weight:500; cursor:pointer;
+  transition: background .12s, border-color .12s; display:inline-flex; align-items:center; gap:6px; min-height:36px;
+  font-family: var(--f);
+}
+.btn-outline:hover  { background: var(--diamond); border-color: var(--text-m); }
+
+.btn-ghost {
+  background:transparent; color:var(--text-2); border:none; border-radius: var(--r-x);
+  padding:6px 10px; font-size:13px; cursor:pointer;
+  transition: background .12s, color .12s; display:inline-flex; align-items:center; gap:5px; min-height:32px;
+  font-family: var(--f);
+}
+.btn-ghost:hover { background: var(--diamond); color: var(--text); }
+
+.btn-danger {
+  background: var(--red-bg); color:var(--red); border:1px solid transparent; border-radius: var(--r-s);
+  padding:7px 14px; font-size:14px; font-weight:500; cursor:pointer;
+  transition: background .12s; display:inline-flex; align-items:center; gap:6px; min-height:36px;
+  font-family: var(--f);
+}
+.btn-danger:hover { background: var(--red); color:#fff; }
+
+/* ─── Form field ─── */
+.field {
+  background: var(--white); border:1px solid var(--border-color); color:var(--text);
+  border-radius: var(--r-s); padding:7px 10px; font-size:14px; outline:none; width:100%;
+  font-family: var(--f); transition: border-color .15s;
+}
+.field:focus { border-color: var(--indigo); box-shadow: 0 0 0 3px var(--indigo-g); }
+.field::placeholder { color: var(--text-m); }
+
+/* ─── Card ─── */
+.card { background: var(--white); border:1px solid var(--border-color); border-radius: var(--r); box-shadow: var(--sh); }
+
+/* ─── Badge ─── */
+.badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:9999px; font-size:12px; font-weight:500; line-height:1.4; }
+
+/* ─── Kbd ─── */
+.kbd { display:inline-flex; align-items:center; padding:1px 5px; border:1px solid var(--border-color); border-radius:4px; background:var(--diamond); font-size:11px; font-family:var(--mono); color:var(--text-2); }
+
+/* ─── Modal backdrop ─── */
+.modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.5); backdrop-filter:blur(2px); z-index:50; display:flex; align-items:center; justify-content:center; padding:16px; animation: fadeIn .15s ease; }
+.modal-box { background:var(--white); border-radius:var(--r); box-shadow:var(--sh-l); width:100%; animation: slideUp .2s ease; }
+@keyframes fadeIn  { from { opacity:0; }             to { opacity:1; } }
+@keyframes slideUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+@keyframes slideIn { from { opacity:0; transform:translateX(-10px); } to { opacity:1; transform:none; } }
+@keyframes toastIn { from { opacity:0; transform:translateX(24px); } to { opacity:1; transform:none; } }
+.toast-enter { animation: toastIn .25s ease; }
+
+/* ─── Connection indicator ─── */
+.conn-dot { width: 7px; height: 7px; border-radius: 9999px; flex-shrink: 0; }
+.conn-dot-pulse { animation: connPulse 1.6s ease-in-out infinite; }
+@keyframes connPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,.55); }
+  50%      { box-shadow: 0 0 0 5px rgba(239,68,68,0); }
+}
+
+/* ─── Dense table ─── */
+.tbl { width:100%; border-collapse:collapse; font-size:13.5px; }
+.tbl th { padding:7px 12px; text-align:right; font-size:11.5px; font-weight:500; color:var(--text-m); background:var(--diamond); border-bottom:1px solid var(--border-color); white-space:nowrap; }
+.tbl td { padding:7px 12px; text-align:right; border-bottom:1px solid var(--border-l); color:var(--text); }
+.tbl tr:last-child td { border-bottom:none; }
+.tbl tbody tr:hover td { background:var(--diamond); }
+
+/* ─── Print ─── */
+@media print { .no-print { display:none !important; } body { background:white !important; } }
