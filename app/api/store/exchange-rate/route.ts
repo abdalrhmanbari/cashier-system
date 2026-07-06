@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireStore, requireManager } from '@/lib/store-auth-helper'
 import { checkStaleExchangeRate } from '@/lib/notifications'
 import { logApiError } from '@/lib/logger'
+import { logAudit } from '@/lib/audit'
 import { z } from 'zod'
 
 const schema = z.object({
@@ -49,6 +50,16 @@ export async function POST(req: NextRequest) {
       },
       include: { createdBy: { select: { name: true } } },
     })
+
+    await logAudit({
+      userId:   t.id,
+      storeId:  t.storeId,
+      action:   'CHANGE_EXCHANGE_RATE',
+      resource: 'EXCHANGE_RATE',
+      resourceId: rate.id,
+      newData:  { rate: data.rate },
+    })
+
     return NextResponse.json(rate, { status: 201 })
   } catch (e) {
     await logApiError(req, e)

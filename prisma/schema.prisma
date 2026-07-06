@@ -18,6 +18,8 @@ model SuperAdmin {
   password  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  auditLogs AuditLog[]
 }
 
 // إعدادات المنصة العامة — صف واحد فقط (id ثابت "singleton")
@@ -100,6 +102,11 @@ model Store {
   roundingRule    String @default("500")
   // pricingCurrency: "USD" | "SYP" — عملة إدخال أسعار المنتجات الجديدة
   pricingCurrency String @default("USD")
+
+  // سقف الخصم الأقصى المسموح لكل دور — نقاط أساس (basis points) بنفس اصطلاح taxRate: 1500 = 15%. null = بلا سقف.
+  // تُقاس كنسبة من إجمالي الفاتورة قبل أي خصم يدوي (خصم الأصناف + خصم الفاتورة معاً)
+  maxDiscountPercentCashier Int?
+  maxDiscountPercentManager Int?
 
   storeTypeId String
   storeType   StoreType @relation(fields: [storeTypeId], references: [id])
@@ -304,10 +311,11 @@ model Expense {
 }
 
 model Category {
-  id      String @id @default(cuid())
-  name    String
-  nameEn  String?
-  color   String @default("#6366f1")
+  id       String  @id @default(cuid())
+  name     String
+  nameEn   String?
+  color    String  @default("#6366f1")
+  imageUrl String?
 
   storeId  String
   store    Store    @relation(fields: [storeId], references: [id])
@@ -610,6 +618,9 @@ model AuditLog {
   store   Store?     @relation(fields: [storeId], references: [id])
   userId  String?
   user    StoreUser? @relation(fields: [userId], references: [id])
+  // فاعل من نوع سوبر أدمن (بدلاً من StoreUser) — عمليات super-admin/* فقط. الاسم/الإيميل ما زالا يُوثَّقان أيضاً بحقل newData لأغراض العرض السريع.
+  superAdminId String?
+  superAdmin   SuperAdmin? @relation(fields: [superAdminId], references: [id])
 }
 
 // type: "LOW_STOCK" | "STALE_EXCHANGE_RATE" | "CUSTOMER_DEBT_LIMIT" | "SUPPLIER_INVOICE_DUE" | "SHIFT_DIFFERENCE" | "SUBSCRIPTION_EXPIRING"

@@ -16,12 +16,13 @@ const ROLE_LABEL: Record<string, { label: string; bg: string; color: string }> =
 }
 const EMPTY_EDIT = { name: '', email: '', password: '', role: 'CASHIER', branchId: '' }
 
-type TabKey = 'branches' | 'users' | 'exchange' | 'tax'
+type TabKey = 'branches' | 'users' | 'exchange' | 'tax' | 'discount'
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: 'branches', label: 'الفروع',              icon: Building2  },
   { key: 'users',    label: 'المستخدمون',         icon: Users      },
   { key: 'exchange', label: 'سعر الصرف والعملات', icon: DollarSign },
   { key: 'tax',      label: 'الضريبة',            icon: Percent    },
+  { key: 'discount', label: 'سقف الخصم',           icon: AlertTriangle },
 ]
 
 type RateRow = { id: string; rate: number; effectiveFrom: string; createdBy: { name: string } }
@@ -53,6 +54,11 @@ function SettingsContent() {
   const [taxName,    setTaxName]    = useState('ضريبة')
   const [taxSaving,  setTaxSaving]  = useState(false)
 
+  // ── سقف الخصم ── basis points بالخادم (1500=15%)، نص فارغ = بلا سقف (null)
+  const [maxDiscountCashierPct, setMaxDiscountCashierPct] = useState('')
+  const [maxDiscountManagerPct, setMaxDiscountManagerPct] = useState('')
+  const [discountCapSaving, setDiscountCapSaving] = useState(false)
+
   const loadExchange = useCallback(async () => {
     const [rateRes, settingsRes] = await Promise.all([
       fetch('/api/store/exchange-rate').then(r => r.json()),
@@ -64,9 +70,33 @@ function SettingsContent() {
     setTaxEnabled(!!settingsRes?.taxEnabled)
     setTaxRatePct(String((settingsRes?.taxRate ?? 0) / 100))
     setTaxName(settingsRes?.taxName ?? 'ضريبة')
+    setMaxDiscountCashierPct(settingsRes?.maxDiscountPercentCashier != null ? String(settingsRes.maxDiscountPercentCashier / 100) : '')
+    setMaxDiscountManagerPct(settingsRes?.maxDiscountPercentManager != null ? String(settingsRes.maxDiscountPercentManager / 100) : '')
   }, [])
 
-  useEffect(() => { if (tab === 'exchange' || tab === 'tax') loadExchange() }, [tab, loadExchange])
+  useEffect(() => { if (tab === 'exchange' || tab === 'tax' || tab === 'discount') loadExchange() }, [tab, loadExchange])
+
+  async function saveDiscountCap(patch: { maxDiscountPercentCashier?: number | null; maxDiscountPercentManager?: number | null }) {
+    setDiscountCapSaving(true)
+    await fetch('/api/store/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })
+    setDiscountCapSaving(false)
+  }
+
+  function submitDiscountCapCashier(e: React.FormEvent) {
+    e.preventDefault()
+    const trimmed = maxDiscountCashierPct.trim()
+    const pct = trimmed === '' ? null : Math.max(0, Math.min(100, parseFloat(trimmed) || 0))
+    setMaxDiscountCashierPct(pct === null ? '' : String(pct))
+    saveDiscountCap({ maxDiscountPercentCashier: pct === null ? null : Math.round(pct * 100) })
+  }
+
+  function submitDiscountCapManager(e: React.FormEvent) {
+    e.preventDefault()
+    const trimmed = maxDiscountManagerPct.trim()
+    const pct = trimmed === '' ? null : Math.max(0, Math.min(100, parseFloat(trimmed) || 0))
+    setMaxDiscountManagerPct(pct === null ? '' : String(pct))
+    saveDiscountCap({ maxDiscountPercentManager: pct === null ? null : Math.round(pct * 100) })
+  }
 
   async function saveTax(patch: { taxEnabled?: boolean; taxRate?: number; taxName?: string }) {
     setTaxSaving(true)
@@ -365,6 +395,42 @@ function SettingsContent() {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+
+      ) : tab === 'discount' ? (
+
+        /* ─── سقف الخصم ─── */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: '480px' }}>
+          <div className="card" style={{ padding: '16px' }}>
+            <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>سقف الخصم الأقصى لكل دور</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-m)', marginBottom: '14px' }}>
+              نسبة الخصم الإجمالية المسموحة بالفاتورة (خصم الأصناف + خصم الفاتورة معاً) لكل دور. اترك الحقل فارغاً لإلغاء السقف (بلا حد أقصى). يُفرض على الخادم مباشرة عند إنشاء أي فاتورة.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <form onSubmit={submitDiscountCapCashier} style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
+                <div style={{ flex: 1 }}>
+                  <Label>سقف الكاشير (%)</Label>
+                  <StInput type="number" min={0} max={100} step={0.01} value={maxDiscountCashierPct}
+                    onChange={e => setMaxDiscountCashierPct(e.target.value)} placeholder="بلا سقف" dir="ltr" />
+                </div>
+                <button type="submit" className="btn-primary" disabled={discountCapSaving} style={{ fontSize: '13px' }}>
+                  {discountCapSaving ? 'جارٍ الحفظ...' : 'حفظ'}
+                </button>
+              </form>
+
+              <form onSubmit={submitDiscountCapManager} style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
+                <div style={{ flex: 1 }}>
+                  <Label>سقف المدير (%)</Label>
+                  <StInput type="number" min={0} max={100} step={0.01} value={maxDiscountManagerPct}
+                    onChange={e => setMaxDiscountManagerPct(e.target.value)} placeholder="بلا سقف" dir="ltr" />
+                </div>
+                <button type="submit" className="btn-primary" disabled={discountCapSaving} style={{ fontSize: '13px' }}>
+                  {discountCapSaving ? 'جارٍ الحفظ...' : 'حفظ'}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
 

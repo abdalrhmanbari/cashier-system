@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { logAudit } from '@/lib/audit'
 import { z } from 'zod'
 
 async function requireSuperAdmin(req: NextRequest) {
@@ -11,6 +12,7 @@ async function requireSuperAdmin(req: NextRequest) {
     cookieName: 'super-admin.session-token',
   })
   if (!token) throw new Error('UNAUTHORIZED')
+  return token
 }
 
 const createSchema = z.object({
@@ -43,7 +45,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireSuperAdmin(req)
+    const token = await requireSuperAdmin(req)
     const body = await req.json()
     const data = createSchema.parse(body)
 
@@ -52,6 +54,15 @@ export async function POST(req: NextRequest) {
     const admin = await prisma.superAdmin.create({
       data:   { name: data.name, email: data.email, password: hashed },
       select: { id: true, name: true, email: true, createdAt: true },
+    })
+
+    const actingAdmin = await prisma.superAdmin.findUnique({ where: { id: token.id as string }, select: { name: true, email: true } })
+    await logAudit({
+      superAdminId: token.id as string,
+      action:   'CREATE_SUPER_ADMIN',
+      resource: 'SUPER_ADMIN',
+      resourceId: admin.id,
+      newData:  { createdName: admin.name, createdEmail: admin.email, byAdminName: actingAdmin?.name, byAdminEmail: actingAdmin?.email },
     })
 
     return NextResponse.json(admin, { status: 201 })
@@ -70,7 +81,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    await requireSuperAdmin(req)
+    const token = await requireSuperAdmin(req)
     const body = await req.json()
     const data = updateSchema.parse(body)
 
@@ -83,6 +94,22 @@ export async function PATCH(req: NextRequest) {
       where:  { id: data.id },
       data:   updateData,
       select: { id: true, name: true, email: true, createdAt: true },
+    })
+
+    // لا يُسجَّل password/hash أبداً بالـ audit — فقط أسماء الحقول المتغيّرة
+    const actingAdmin = await prisma.superAdmin.findUnique({ where: { id: token.id as string }, select: { name: true, email: true } })
+    await logAudit({
+      superAdminId: token.id as string,
+      action:   'UPDATE_SUPER_ADMIN',
+      resource: 'SUPER_ADMIN',
+      resourceId: admin.id,
+      newData:  {
+        changedFields: Object.keys(updateData).filter(k => k !== 'password'),
+        passwordChanged: !!data.password,
+        byAdminName: actingAdmin?.name,
+        byAdminEmail: actingAdmin?.email,
+        isSelfEdit: token.id === admin.id,
+      },
     })
 
     return NextResponse.json(admin)

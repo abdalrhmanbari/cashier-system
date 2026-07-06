@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
         ...(q           ? { name: { contains: q } } : {}),
         ...(categoryId  ? { categoryId }             : {}),
       },
-      include: { category: { select: { id: true, name: true, color: true } } },
+      include: { category: { select: { id: true, name: true, color: true, imageUrl: true } } },
       orderBy: { name: 'asc' },
     })
 
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
 
     const product = await prisma.product.create({
       data: { ...data, priceCurrency: store?.pricingCurrency ?? 'USD', storeId: t.storeId },
-      include: { category: { select: { id: true, name: true, color: true } } },
+      include: { category: { select: { id: true, name: true, color: true, imageUrl: true } } },
     })
     return NextResponse.json(product, { status: 201 })
   } catch (e) {

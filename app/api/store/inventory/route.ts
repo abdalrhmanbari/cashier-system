@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireStore, requireManager } from '@/lib/store-auth-helper'
 import { checkLowStock } from '@/lib/notifications'
+import { logAudit } from '@/lib/audit'
 import { z } from 'zod'
 
 const adjustSchema = z.object({
@@ -111,6 +112,18 @@ export async function POST(req: NextRequest) {
         },
       })
     })
+
+    if (data.type === 'ADJUSTMENT') {
+      await logAudit({
+        userId:   t.id,
+        storeId:  t.storeId,
+        action:   'INVENTORY_ADJUSTMENT',
+        resource: 'PRODUCT',
+        resourceId: product.id,
+        oldData:  { stock: product.stock },
+        newData:  { stock: movement.quantityAfter, delta, note: data.note ?? null },
+      })
+    }
 
     // إشعار — best-effort، لا يُفشل عملية التسوية أبداً
     await checkLowStock(t.storeId, product.id)

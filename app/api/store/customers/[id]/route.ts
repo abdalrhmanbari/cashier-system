@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireStore, requireManager } from '@/lib/store-auth-helper'
 import { logApiError } from '@/lib/logger'
+import { logAudit } from '@/lib/audit'
 import { z } from 'zod'
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -105,6 +106,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         })
         return updated
       })
+
+      await logAudit({
+        userId:   t.id,
+        storeId:  t.storeId,
+        action:   'CUSTOMER_PAYMENT',
+        resource: 'CUSTOMER',
+        resourceId: params.id,
+        oldData:  { currentBalance: existing.currentBalance },
+        newData:  { currentBalance: newBalance, payment: body.payment, method },
+      })
+
       return NextResponse.json(customer)
     }
 

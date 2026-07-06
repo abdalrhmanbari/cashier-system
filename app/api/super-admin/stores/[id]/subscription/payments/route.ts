@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 
 async function requireSuperAdmin(req: NextRequest) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET, cookieName: 'super-admin.session-token' })
@@ -55,15 +56,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       },
     })
 
-    await prisma.auditLog.create({
-      data: {
-        action:     'RECORD_SUBSCRIPTION_PAYMENT',
-        resource:   'SUBSCRIPTION',
-        resourceId: sub.id,
-        storeId:    params.id,
-        newData:    JSON.stringify({ adminName: admin?.name, amountUsd: payment.amountUsd, method }),
-      },
-    })
+    try {
+      await prisma.auditLog.create({
+        data: {
+          action:     'RECORD_SUBSCRIPTION_PAYMENT',
+          resource:   'SUBSCRIPTION',
+          resourceId: sub.id,
+          storeId:    params.id,
+          superAdminId: token.id as string,
+          newData:    JSON.stringify({ adminName: admin?.name, amountUsd: payment.amountUsd, method }),
+        },
+      })
+    } catch (e) {
+      logger.error('فشل تسجيل AuditLog', { action: 'RECORD_SUBSCRIPTION_PAYMENT', storeId: params.id, err: (e as Error)?.message })
+    }
 
     return NextResponse.json(payment)
   } catch (err) {

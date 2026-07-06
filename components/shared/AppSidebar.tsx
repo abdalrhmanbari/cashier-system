@@ -8,8 +8,10 @@ import {
   ShoppingCart, Package, Clock, Users, Truck, BarChart2, Settings,
   LayoutDashboard, Store, CreditCard, BadgeDollarSign, Tag,
   Building2, LogOut, ShieldCheck, MoreHorizontal, X, Wallet, Undo2, Boxes, Wrench,
-  Activity, FileWarning, HeartPulse,
+  Activity, FileWarning, HeartPulse, MessageCircle,
 } from 'lucide-react'
+
+const WHATSAPP_CONTACT_URL = 'https://wa.me/963982050174'
 
 type Role = 'SUPER_ADMIN' | 'STORE_MANAGER' | 'CASHIER'
 
@@ -20,6 +22,8 @@ interface NavItem {
   exact?: boolean
   /** يُعرض كعنوان قسم قبل هذا العنصر إن اختلف عن قسم العنصر السابق (السوبر أدمن فقط حالياً) */
   section?: string
+  /** رابط خارجي (لا يُضاف إليه بادئة المتجر ويُفتح في تبويب جديد) */
+  external?: boolean
 }
 
 interface AppSidebarProps {
@@ -53,12 +57,14 @@ const MANAGER_NAV: NavItem[] = [
   { href: '/expenses',  label: 'المصاريف',    icon: Wallet       },
   { href: '/reports',   label: 'التقارير',    icon: BarChart2    },
   { href: '/settings',  label: 'الإعدادات',   icon: Settings     },
+  { href: WHATSAPP_CONTACT_URL, label: 'تواصل معنا', icon: MessageCircle, external: true },
 ]
 
 const CASHIER_NAV: NavItem[] = [
   { href: '/pos',      label: 'نقطة البيع', icon: ShoppingCart, exact: true },
   { href: '/shifts',   label: 'الورديات',   icon: Clock        },
   { href: '/returns',  label: 'المرتجعات',  icon: Undo2        },
+  { href: WHATSAPP_CONTACT_URL, label: 'تواصل معنا', icon: MessageCircle, external: true },
 ]
 
 const ROLE_LABEL: Record<Role, string> = {
@@ -72,10 +78,11 @@ export default function AppSidebar({ role, userName, slug, storeName }: AppSideb
   const [moreOpen, setMoreOpen] = useState(false)
 
   const navItems = role === 'SUPER_ADMIN' ? SUPER_ADMIN_NAV : role === 'STORE_MANAGER' ? MANAGER_NAV : CASHIER_NAV
-  const resolve  = (href: string) => role === 'SUPER_ADMIN' ? href : `/${slug}${href}`
+  const resolve  = (item: NavItem) => item.external ? item.href : (role === 'SUPER_ADMIN' ? item.href : `/${slug}${item.href}`)
 
   const isActive = (item: NavItem) => {
-    const full = resolve(item.href)
+    if (item.external) return false
+    const full = resolve(item)
     return item.exact ? pathname === full : pathname === full || pathname.startsWith(`${full}/`)
   }
 
@@ -109,8 +116,7 @@ export default function AppSidebar({ role, userName, slug, storeName }: AppSideb
               <ShieldCheck size={14} color="#fff" />
             </div>
             <div>
-              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', lineHeight: 1 }}>لوحة تحكم</p>
-              <p style={{ fontSize: '13px', fontWeight: 600, color: '#fff', marginTop: '2px' }}>المنصة</p>
+              <p style={{ fontSize: '15px', fontWeight: 600, color: '#fff', marginTop: '2px' }}>SUPER ADMIN</p>
             </div>
           </div>
         ) : (
@@ -147,7 +153,9 @@ export default function AppSidebar({ role, userName, slug, storeName }: AppSideb
               </p>
             )}
             <Link
-              href={resolve(item.href)}
+              href={resolve(item)}
+              target={item.external ? '_blank' : undefined}
+              rel={item.external ? 'noopener noreferrer' : undefined}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -237,7 +245,9 @@ export default function AppSidebar({ role, userName, slug, storeName }: AppSideb
           return (
             <Link
               key={item.href}
-              href={resolve(item.href)}
+              href={resolve(item)}
+              target={item.external ? '_blank' : undefined}
+              rel={item.external ? 'noopener noreferrer' : undefined}
               style={{
                 flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 gap: '2px', textDecoration: 'none', fontSize: '10px',
@@ -288,7 +298,9 @@ export default function AppSidebar({ role, userName, slug, storeName }: AppSideb
               return (
                 <Link
                   key={item.href}
-                  href={resolve(item.href)}
+                  href={resolve(item)}
+                  target={item.external ? '_blank' : undefined}
+                  rel={item.external ? 'noopener noreferrer' : undefined}
                   onClick={() => setMoreOpen(false)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',

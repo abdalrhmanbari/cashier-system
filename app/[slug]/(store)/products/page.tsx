@@ -6,7 +6,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import { StInput, StSelect } from '@/components/shared/StInput'
 import { formatUsd, formatSyp } from '@/lib/utils'
 
-type Category = { id: string; name: string; color: string; _count?: { products: number } }
+type Category = { id: string; name: string; color: string; imageUrl?: string | null; _count?: { products: number } }
 type Product  = {
   id: string; name: string; barcode: string | null; price: number; priceCurrency: string; costPrice: number
   stock: number; minStock: number; lowStockThreshold: number | null; isActive: boolean; hasDiscount: boolean
@@ -56,10 +56,10 @@ export default function ProductsPage() {
   const [deleting,   setDeleting]   = useState<Product | null>(null)
 
   const [showCatModal, setShowCatModal] = useState(false)
-  const [catForm,      setCatForm]      = useState({ name: '', color: PRESET_COLORS[0] })
+  const [catForm,      setCatForm]      = useState({ name: '', color: PRESET_COLORS[0], imageUrl: '' })
   const [catSaving,    setCatSaving]    = useState(false)
   const [editingCat,   setEditingCat]   = useState<Category | null>(null)
-  const [editCatForm,  setEditCatForm]  = useState({ name: '', color: '' })
+  const [editCatForm,  setEditCatForm]  = useState({ name: '', color: '', imageUrl: '' })
   const [pricingCurrency, setPricingCurrency] = useState('USD')
 
   const load = useCallback(async () => {
@@ -104,7 +104,7 @@ export default function ProductsPage() {
     const res = await fetch('/api/store/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(catForm) })
     const cat = await res.json()
     setCategories(prev => [...prev, cat].sort((a, b) => a.name.localeCompare(b.name)))
-    setCatForm({ name: '', color: PRESET_COLORS[0] }); setCatSaving(false)
+    setCatForm({ name: '', color: PRESET_COLORS[0], imageUrl: '' }); setCatSaving(false)
   }
 
   async function saveEditCat(id: string) {
@@ -339,21 +339,24 @@ export default function ProductsPage() {
             {/* إضافة جديد */}
             <div style={{ padding: '12px 16px', background: 'var(--diamond)', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }}>
               <p style={{ fontSize: '11.5px', fontWeight: 500, color: 'var(--text-m)', marginBottom: '8px' }}>إضافة تصنيف جديد</p>
-              <form onSubmit={addCategory} style={{ display: 'flex', gap: '7px', alignItems: 'center' }}>
-                <div style={{ flex: 1 }}>
-                  <StInput value={catForm.name} onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))} placeholder="اسم التصنيف..." required />
+              <form onSubmit={addCategory} style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                <div style={{ display: 'flex', gap: '7px', alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <StInput value={catForm.name} onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))} placeholder="اسم التصنيف..." required />
+                  </div>
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '120px' }}>
+                    {PRESET_COLORS.map(c => (
+                      <button key={c} type="button" onClick={() => setCatForm(f => ({ ...f, color: c }))}
+                        style={{ width: '18px', height: '18px', borderRadius: '9999px', background: c, border: catForm.color === c ? '2px solid var(--text)' : '2px solid transparent', cursor: 'pointer', transition: 'transform .1s' }}
+                        onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.2)')}
+                        onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')} />
+                    ))}
+                  </div>
+                  <button type="submit" className="btn-primary" disabled={catSaving} style={{ fontSize: '12.5px', padding: '6px 12px', whiteSpace: 'nowrap' }}>
+                    <Plus size={13} /> إضافة
+                  </button>
                 </div>
-                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '120px' }}>
-                  {PRESET_COLORS.map(c => (
-                    <button key={c} type="button" onClick={() => setCatForm(f => ({ ...f, color: c }))}
-                      style={{ width: '18px', height: '18px', borderRadius: '9999px', background: c, border: catForm.color === c ? '2px solid var(--text)' : '2px solid transparent', cursor: 'pointer', transition: 'transform .1s' }}
-                      onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.2)')}
-                      onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')} />
-                  ))}
-                </div>
-                <button type="submit" className="btn-primary" disabled={catSaving} style={{ fontSize: '12.5px', padding: '6px 12px', whiteSpace: 'nowrap' }}>
-                  <Plus size={13} /> إضافة
-                </button>
+                <StInput value={catForm.imageUrl} onChange={e => setCatForm(f => ({ ...f, imageUrl: e.target.value }))} placeholder="رابط صورة التصنيف (اختياري)..." dir="ltr" />
               </form>
             </div>
             {/* قائمة التصنيفات */}
@@ -364,6 +367,7 @@ export default function ProductsPage() {
                   {editingCat?.id === cat.id ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
                       <StInput value={editCatForm.name} onChange={e => setEditCatForm(f => ({ ...f, name: e.target.value }))} />
+                      <StInput value={editCatForm.imageUrl} onChange={e => setEditCatForm(f => ({ ...f, imageUrl: e.target.value }))} placeholder="رابط صورة التصنيف (اختياري)..." dir="ltr" />
                       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                         {PRESET_COLORS.map(c => (
                           <button key={c} type="button" onClick={() => setEditCatForm(f => ({ ...f, color: c }))}
@@ -380,11 +384,15 @@ export default function ProductsPage() {
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ width: '10px', height: '10px', borderRadius: '9999px', background: cat.color, display: 'inline-block' }} />
+                        {cat.imageUrl ? (
+                          <img src={cat.imageUrl} alt={cat.name} style={{ width: '22px', height: '22px', borderRadius: '6px', objectFit: 'cover', flexShrink: 0 }} />
+                        ) : (
+                          <span style={{ width: '10px', height: '10px', borderRadius: '9999px', background: cat.color, display: 'inline-block' }} />
+                        )}
                         <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>{cat.name}</span>
                         {cat._count !== undefined && <span style={{ fontSize: '11.5px', color: 'var(--text-m)' }}>{cat._count.products} منتج</span>}
                       </div>
-                      <IconBtn onClick={() => { setEditingCat(cat); setEditCatForm({ name: cat.name, color: cat.color }) }}>
+                      <IconBtn onClick={() => { setEditingCat(cat); setEditCatForm({ name: cat.name, color: cat.color, imageUrl: cat.imageUrl ?? '' }) }}>
                         <Edit2 size={12} />
                       </IconBtn>
                     </div>

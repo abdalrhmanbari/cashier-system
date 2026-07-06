@@ -6,10 +6,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   try {
     const t = await requireStore(req)
     requireManager(t)
-    const { name, color } = await req.json()
+    const { name, color, imageUrl } = await req.json()
     const cat = await prisma.category.update({
       where: { id: params.id, storeId: t.storeId },
-      data: { name, color },
+      data: { name, color, imageUrl: imageUrl || null },
     })
     return NextResponse.json(cat)
   } catch (e) {

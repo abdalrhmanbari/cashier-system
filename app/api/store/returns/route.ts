@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     const sale = await prisma.sale.findFirst({
       where: { id: data.saleId, storeId: t.storeId },
       include: {
-        items: { include: { returnItems: { select: { quantity: true } } } },
+        items: { include: { returnItems: { select: { quantity: true, total: true, taxRefund: true } } } },
       },
     })
     if (!sale) return NextResponse.json({ error: 'الفاتورة غير موجودة' }, { status: 404 })
@@ -65,8 +65,19 @@ export async function POST(req: NextRequest) {
 
       // المبلغ المسترجَع فعلياً = نصيب الكمية المرجعة من (netLineTotal + lineTax) — صافي بعد كل الخصومات شاملاً نصيبه من الضريبة
       // الزبون يسترد بالضبط ما دفعه فعلاً مقابل هذه الكمية، لا أكثر ولا أقل (بما فيها الضريبة)
-      const netRefund = Math.round((saleItem.netLineTotal * reqItem.quantity) / saleItem.quantity)
-      const taxRefund  = Math.round((saleItem.lineTax     * reqItem.quantity) / saleItem.quantity)
+      let netRefund: number
+      let taxRefund: number
+      const isFinalReturn = alreadyReturned + reqItem.quantity === saleItem.quantity
+      if (isFinalReturn) {
+        // الدفعة الأخيرة تأخذ "المتبقي المالي بالضبط" بدل الحساب النسبي — يضمن أن مجموع كل الاسترجاعات الجزئية = netLineTotal + lineTax تماماً بلا انجراف تقريب متراكم
+        const prevNetRefund = saleItem.returnItems.reduce((s, r) => s + (r.total - r.taxRefund), 0)
+        const prevTaxRefund = saleItem.returnItems.reduce((s, r) => s + r.taxRefund, 0)
+        netRefund = saleItem.netLineTotal - prevNetRefund
+        taxRefund = saleItem.lineTax - prevTaxRefund
+      } else {
+        netRefund = Math.round((saleItem.netLineTotal * reqItem.quantity) / saleItem.quantity)
+        taxRefund = Math.round((saleItem.lineTax     * reqItem.quantity) / saleItem.quantity)
+      }
 
       returnItems.push({
         saleItemId: saleItem.id,

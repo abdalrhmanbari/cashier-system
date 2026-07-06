@@ -5,14 +5,13 @@ import { useTheme } from './ThemeProvider'
 import { ExchangeRateIndicator } from './ExchangeRateIndicator'
 import { ConnectionIndicator } from './ConnectionIndicator'
 import { NotificationBell } from './NotificationBell'
+import { SITE_NAME } from '@/lib/site'
 
 interface StoreHeaderProps {
   userName: string
   roleLabel: string
   isManager?: boolean
 }
-
-const SITE_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? 'منصة الكاشير'
 
 export function StoreHeader({ userName, roleLabel, isManager = false }: StoreHeaderProps) {
   const { theme, toggle } = useTheme()
@@ -49,7 +48,7 @@ export function StoreHeader({ userName, roleLabel, isManager = false }: StoreHea
             fontWeight: 700,
           }}
         >
-          M
+          CS
         </div>
         <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text)' }}>{SITE_NAME}</span>
       </div>

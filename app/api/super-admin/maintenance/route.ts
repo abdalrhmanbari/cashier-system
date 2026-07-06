@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { prisma } from '@/lib/prisma'
 import { getPlatformSettings, GRACE_MINUTES_OPTIONS } from '@/lib/maintenance'
+import { logger } from '@/lib/logger'
 import { z } from 'zod'
 
 async function requireSuperAdmin(req: NextRequest) {
@@ -66,17 +67,22 @@ export async function PATCH(req: NextRequest) {
       const activeStoreCount = await prisma.store.count({
         where: { isActive: true, subscription: { status: { in: ['ACTIVE', 'TRIAL'] } } },
       })
-      await prisma.auditLog.create({
-        data: {
-          action:   data.enabled ? 'ENABLE_MAINTENANCE' : 'DISABLE_MAINTENANCE',
-          resource: 'PLATFORM_SETTING',
-          newData: JSON.stringify({
-            adminName: admin?.name, adminEmail: admin?.email,
-            message: updated.maintenanceMessage, endsAt: updated.maintenanceEndsAt,
-            graceMinutes: updated.maintenanceGraceMinutes, activeStoreCount,
-          }),
-        },
-      })
+      try {
+        await prisma.auditLog.create({
+          data: {
+            action:   data.enabled ? 'ENABLE_MAINTENANCE' : 'DISABLE_MAINTENANCE',
+            resource: 'PLATFORM_SETTING',
+            superAdminId: token.id as string,
+            newData: JSON.stringify({
+              adminName: admin?.name, adminEmail: admin?.email,
+              message: updated.maintenanceMessage, endsAt: updated.maintenanceEndsAt,
+              graceMinutes: updated.maintenanceGraceMinutes, activeStoreCount,
+            }),
+          },
+        })
+      } catch (e) {
+        logger.error('فشل تسجيل AuditLog', { action: data.enabled ? 'ENABLE_MAINTENANCE' : 'DISABLE_MAINTENANCE', err: (e as Error)?.message })
+      }
     }
 
     return NextResponse.json(updated)

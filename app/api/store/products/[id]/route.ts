@@ -48,7 +48,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const product = await prisma.product.update({
       where:   { id: params.id, storeId: t.storeId },
       data:    { ...data, ...(priceCurrency ? { priceCurrency } : {}) },
-      include: { category: { select: { id: true, name: true, color: true } } },
+      include: { category: { select: { id: true, name: true, color: true, imageUrl: true } } },
     })
     return NextResponse.json(product)
   } catch (e) {

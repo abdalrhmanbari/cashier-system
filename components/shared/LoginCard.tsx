@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, ShoppingCart, Zap, BarChart2, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { SITE_NAME } from '@/lib/site'
 
 interface LoginCardProps {
   title: string
@@ -12,8 +13,6 @@ interface LoginCardProps {
   loading?: boolean
   submitLabel?: string
 }
-
-const SITE_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? 'منصة الكاشير'
 
 const FEATURES = [
   { icon: Zap,        label: 'نقطة بيع سريعة وسهلة الاستخدام' },

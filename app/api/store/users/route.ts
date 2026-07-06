@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireStore, requireManager } from '@/lib/store-auth-helper'
 import bcrypt from 'bcryptjs'
+import { logAudit } from '@/lib/audit'
 import { z } from 'zod'
 
 const createSchema = z.object({
@@ -53,6 +54,16 @@ export async function POST(req: NextRequest) {
       },
       select: userSelect,
     })
+
+    await logAudit({
+      userId:   t.id,
+      storeId:  t.storeId,
+      action:   'CREATE_USER',
+      resource: 'STORE_USER',
+      resourceId: user.id,
+      newData:  { name: user.name, email: user.email, role: user.role, branchId: user.branchId },
+    })
+
     return NextResponse.json(user, { status: 201 })
   } catch (e) {
     const err = e as Error & { status?: number }
@@ -76,6 +87,16 @@ export async function PATCH(req: NextRequest) {
         data:   { isActive },
         select: userSelect,
       })
+
+      await logAudit({
+        userId:   t.id,
+        storeId:  t.storeId,
+        action:   'UPDATE_USER',
+        resource: 'STORE_USER',
+        resourceId: user.id,
+        newData:  { isActive },
+      })
+
       return NextResponse.json(user)
     }
 
@@ -100,6 +121,17 @@ export async function PATCH(req: NextRequest) {
       data,
       select: userSelect,
     })
+
+    // لا يُسجَّل password/hash أبداً بالـ audit — نسجّل فقط أسماء الحقول التي تغيّرت
+    await logAudit({
+      userId:   t.id,
+      storeId:  t.storeId,
+      action:   'UPDATE_USER',
+      resource: 'STORE_USER',
+      resourceId: user.id,
+      newData:  { changedFields: Object.keys(data).filter(k => k !== 'password'), passwordChanged: !!password },
+    })
+
     return NextResponse.json(user)
   } catch (e) {
     const err = e as Error & { status?: number }

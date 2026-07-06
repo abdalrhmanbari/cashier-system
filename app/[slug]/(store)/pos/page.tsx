@@ -10,7 +10,7 @@ import { formatSyp, formatUsd } from '@/lib/utils'
 import { printReceipt } from '@/lib/print/receipt'
 import { useExchangeRate } from '@/components/shared/ExchangeRateContext'
 
-type Category = { id: string; name: string; color: string }
+type Category = { id: string; name: string; color: string; imageUrl?: string | null }
 type Product  = {
   id: string; name: string; barcode: string | null; price: number; priceCurrency: string
   stock: number; hasDiscount: boolean; discountType: string | null; discountValue: number
@@ -60,12 +60,15 @@ function PosContent() {
   const [taxEnabled,      setTaxEnabled]       = useState(false)
   const [taxRateBp,       setTaxRateBp]        = useState(0)
   const [taxName,         setTaxName]          = useState('ضريبة')
+  const [maxDiscountCashierBp, setMaxDiscountCashierBp] = useState<number | null>(null)
+  const [maxDiscountManagerBp, setMaxDiscountManagerBp] = useState<number | null>(null)
 
   const [payMethod,  setPayMethod]  = useState<'CASH' | 'CREDIT'>('CASH')
   const [discount,   setDiscount]   = useState(0)
 
   const [cartOpen,     setCartOpen]     = useState(false)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [amountPaid,   setAmountPaid]   = useState('')
   const [processing,   setProcessing]   = useState(false)
 
@@ -95,6 +98,8 @@ function PosContent() {
     setTaxEnabled(!!st?.taxEnabled)
     setTaxRateBp(st?.taxRate ?? 0)
     setTaxName(st?.taxName ?? 'ضريبة')
+    setMaxDiscountCashierBp(typeof st?.maxDiscountPercentCashier === 'number' ? st.maxDiscountPercentCashier : null)
+    setMaxDiscountManagerBp(typeof st?.maxDiscountPercentManager === 'number' ? st.maxDiscountPercentManager : null)
     setLoading(false)
   }, [])
 
@@ -161,6 +166,16 @@ function PosContent() {
 
   function removeLine(id: string) { setCart(prev => prev.filter(c => c.id !== id)) }
 
+  function deleteInvoice() {
+    if (cart.length === 0) return
+    setDeleteConfirmOpen(true)
+  }
+
+  function confirmDeleteInvoice() {
+    setCart([]); setDiscount(0); setSelectedCustomer(null); setCustomerSearch('')
+    setCartOpen(false); setDeleteConfirmOpen(false)
+  }
+
   // إن تغيّر سعر الصرف وبالسلة أصناف بعملة USD، أعِد حساب معادلها بالليرة فوراً دون انتظار تعديل الكمية
   useEffect(() => {
     if (!rate) return
@@ -169,6 +184,10 @@ function PosContent() {
 
   const subtotal      = cart.reduce((s, c) => s + c.lineTotalSyp, 0)
   const netAfterDiscount = Math.max(0, subtotal - discount)
+  // تنبيه UX فقط — الفرض الفعلي بالسيرفر (app/api/store/sales/route.ts)
+  const discountCapBp = session?.user?.role === 'STORE_MANAGER' ? maxDiscountManagerBp : maxDiscountCashierBp
+  const discountPercentBp = subtotal > 0 ? Math.round((discount / subtotal) * 10000) : 0
+  const discountOverCap = discountCapBp != null && discountPercentBp > discountCapBp
   const taxActive     = taxEnabled && taxRateBp > 0
   // معاينة تقريبية — القيمة النهائية الدقيقة (بعد تقريب الفاتورة) تُحسب في الخادم وتُعرض في شاشة النجاح
   const taxPreview    = taxActive ? Math.round((netAfterDiscount * taxRateBp) / 10000) : 0
@@ -268,9 +287,19 @@ function PosContent() {
           <ShoppingCart size={16} style={{ color: 'var(--indigo)' }} />
           <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text)' }}>الفاتورة الحالية</span>
         </div>
-        <span style={{ background: 'var(--diamond)', color: 'var(--text-2)', padding: '2px 8px', borderRadius: '9999px', fontSize: '12px', fontWeight: 500 }}>
-          {itemCount} صنف
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ background: 'var(--diamond)', color: 'var(--text-2)', padding: '2px 8px', borderRadius: '9999px', fontSize: '12px', fontWeight: 500 }}>
+            {itemCount} صنف
+          </span>
+          {cart.length > 0 && (
+            <button onClick={deleteInvoice} title="حذف الفاتورة"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', borderRadius: 'var(--r-s)', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-m)', cursor: 'pointer' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--red-bg)'; e.currentTarget.style.color = 'var(--red)'; e.currentTarget.style.borderColor = 'var(--red)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-m)'; e.currentTarget.style.borderColor = 'var(--border-color)' }}>
+              <Trash2 size={13} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* أصناف السلة */}
@@ -351,6 +380,11 @@ function PosContent() {
               onFocus={e => e.currentTarget.style.borderColor = 'var(--indigo)'}
               onBlur={e  => e.currentTarget.style.borderColor = 'var(--border-color)'} />
           </div>
+          {discountOverCap && (
+            <div style={{ fontSize: '11.5px', color: 'var(--red, #dc2626)', textAlign: 'right' }}>
+              نسبة الخصم ({(discountPercentBp / 100).toFixed(1)}%) تتجاوز سقفك المسموح ({(discountCapBp! / 100).toFixed(1)}%) — سيُرفض الطلب من الخادم
+            </div>
+          )}
           {taxActive && (
             <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-2)' }}>
               <span>{taxName}</span>
@@ -487,22 +521,28 @@ function PosContent() {
                       position: 'relative', display: 'flex', flexDirection: 'column', textAlign: 'right',
                       background: 'var(--white)', borderRadius: 'var(--r-s)',
                       border: inCart ? `2px solid var(--indigo)` : '1px solid var(--border-color)',
-                      padding: '10px', cursor: (out || !rate) ? 'not-allowed' : 'pointer',
+                      padding: '0', cursor: (out || !rate) ? 'not-allowed' : 'pointer',
                       opacity: (out || !rate) ? .55 : 1, transition: 'box-shadow .12s, border-color .12s',
                       boxShadow: inCart ? '0 0 0 3px var(--indigo-g)' : 'var(--sh)',
                       fontFamily: 'var(--f)',
                     }}
+                    className="   "
                     onMouseEnter={e => { if (!out) (e.currentTarget as HTMLElement).style.boxShadow = 'var(--sh-m)'; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = inCart ? '0 0 0 3px var(--indigo-g)' : 'var(--sh)'; }}
                   >
-                    {/* مربع الأحرف */}
-                    <div style={{
-                      height: '52px', width: '100%', borderRadius: 'var(--r-x)', marginBottom: '8px',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: tc.bg, color: tc.color, fontSize: '18px', fontWeight: 700,
-                    }}>
-                      {p.name.split(' ').slice(0, 2).map(w => w[0]).join('')}
-                    </div>
+                    {/* صورة الفئة أو مربع الأحرف */}
+                    {p.category?.imageUrl ? (
+                      <img src={p.category.imageUrl} alt={p.category.name}
+                        style={{ height: '80px', width: '100%', borderTopRightRadius: 'var(--r-x)', borderTopLeftRadius:'var(--r-x)', marginBottom: '8px', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{
+                        height: '80px', width: '100%', borderTopRightRadius: 'var(--r-x)', borderTopLeftRadius:'var(--r-x)', marginBottom: '8px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: tc.bg, color: tc.color, fontSize: '18px', fontWeight: 700,
+                      }}>
+                        {p.name.split(' ').slice(0, 2).map(w => w[0]).join('')}
+                      </div>
+                    )}
 
                     {/* شارة الكمية */}
                     {inCart && (
@@ -513,10 +553,12 @@ function PosContent() {
                         fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}>{inCart.qty}</div>
                     )}
+                      <div className=' p-2'>
 
                     <p style={{ fontSize: '12.5px', fontWeight: 500, color: 'var(--text)', lineHeight: 1.3, marginBottom: '6px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                       {p.name}
                     </p>
+                    <div className=' flex justify-between flex-row-reverse '>
                     {p.priceCurrency === 'USD' ? (
                       <>
                         <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--indigo)', fontFamily: 'var(--mono)', marginTop: 'auto' }}>
@@ -531,15 +573,17 @@ function PosContent() {
                         {formatSyp(price)}
                       </p>
                     )}
+                    </div>
                     <p style={{ fontSize: '11px', color: out ? 'var(--red)' : 'var(--text-m)', marginTop: '2px' }}>
                       {out ? 'غير متوفر' : `المتاح: ${p.stock}`}
                     </p>
+              </div>
                   </button>
                 )
               })}
             </div>
           )}
-        </div>
+          </div>
       </div>
 
       {/* ═══ سلة الفاتورة — سطح المكتب ═══ */}
@@ -697,11 +741,34 @@ function PosContent() {
               )}
 
               <button onClick={checkout}
-                disabled={processing || (payMethod==='CASH' && (!amountPaid||parseFloat(amountPaid)<total)) || (payMethod==='CREDIT'&&!selectedCustomer)}
+                disabled={processing || discountOverCap || (payMethod==='CASH' && (!amountPaid||parseFloat(amountPaid)<total)) || (payMethod==='CREDIT'&&!selectedCustomer)}
                 className="btn-primary" style={{ width: '100%', justifyContent: 'center', background: 'var(--green)', padding: '10px', fontSize: '14px', fontWeight: 700, borderRadius: 'var(--r-s)', opacity: processing ? .7 : 1 }}
                 onMouseEnter={e => (e.currentTarget.style.opacity = '.85')}
                 onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
                 {processing ? 'جارٍ الحفظ...' : '✓ تأكيد البيع'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ مودال تأكيد حذف الفاتورة ═══ */}
+      {deleteConfirmOpen && (
+        <div className="modal-backdrop" dir="rtl">
+          <div className="modal-box" style={{ maxWidth: '340px', textAlign: 'center', padding: '24px' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '9999px', background: 'var(--red-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+              <Trash2 size={26} style={{ color: 'var(--red)' }} />
+            </div>
+            <h3 style={{ fontWeight: 700, fontSize: '16px', color: 'var(--text)' }}>حذف الفاتورة؟</h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-m)', marginTop: '6px', marginBottom: '18px' }}>
+              سيتم إفراغ السلة بالكامل وحذف كل الأصناف المضافة.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <button onClick={() => setDeleteConfirmOpen(false)} className="btn-outline" style={{ justifyContent: 'center' }}>
+                تراجع
+              </button>
+              <button onClick={confirmDeleteInvoice} className="btn-primary" style={{ justifyContent: 'center', background: 'var(--red)' }}>
+                حذف
               </button>
             </div>
           </div>

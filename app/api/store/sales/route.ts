@@ -73,7 +73,10 @@ export async function POST(req: NextRequest) {
 
     const store = await prisma.store.findUnique({
       where:  { id: t.storeId },
-      select: { taxRate: true, taxEnabled: true, taxName: true, roundingRule: true },
+      select: {
+        taxRate: true, taxEnabled: true, taxName: true, roundingRule: true,
+        maxDiscountPercentCashier: true, maxDiscountPercentManager: true,
+      },
     })
 
     const productIds = data.items.map(i => i.productId)
@@ -83,6 +86,7 @@ export async function POST(req: NextRequest) {
     const productMap = new Map(products.map(p => [p.id, p]))
 
     let subtotalSyp = 0
+    let totalItemDiscounts = 0
     const itemsToCreate: {
       productId: string; quantity: number; unitPrice: number; discount: number; total: number; priceCurrency: string
     }[] = []
@@ -104,6 +108,7 @@ export async function POST(req: NextRequest) {
         )
       }
       subtotalSyp += lineTotal
+      totalItemDiscounts += reqItem.discount
 
       itemsToCreate.push({
         productId:     reqItem.productId,
@@ -121,6 +126,24 @@ export async function POST(req: NextRequest) {
         { error: 'قيمة الخصم أكبر من إجمالي الفاتورة — يرجى تصحيح المبلغ' },
         { status: 400 }
       )
+    }
+
+    // سقف الخصم القابل للضبط لكل دور — نسبة الخصم الإجمالية (أصناف + فاتورة) من الإجمالي قبل أي خصم يدوي
+    const maxDiscountPercent = t.role === 'STORE_MANAGER'
+      ? store?.maxDiscountPercentManager
+      : store?.maxDiscountPercentCashier
+    const grossBeforeManualDiscount = subtotalSyp + totalItemDiscounts
+    if (maxDiscountPercent != null && grossBeforeManualDiscount > 0) {
+      const totalDiscountSyp = totalItemDiscounts + data.discount
+      const discountBasisPoints = Math.round((totalDiscountSyp / grossBeforeManualDiscount) * 10000)
+      if (discountBasisPoints > maxDiscountPercent) {
+        return NextResponse.json(
+          {
+            error: `نسبة الخصم الإجمالية (${(discountBasisPoints / 100).toFixed(1)}%) تتجاوز السقف المسموح لدورك (${(maxDiscountPercent / 100).toFixed(1)}%)`,
+          },
+          { status: 400 }
+        )
+      }
     }
 
     // توزيع خصم إجمالي الفاتورة على الأسطر نسبياً حسب قيمة كل سطر — netLineTotal هو الرقم المرجعي الوحيد لما دفعه الزبون فعلاً لكل سطر (قبل الضريبة)

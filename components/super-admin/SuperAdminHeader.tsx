@@ -3,12 +3,11 @@
 import { Sun, Moon, ShieldCheck } from 'lucide-react'
 import { useTheme } from '@/components/shared/ThemeProvider'
 import { NotificationBell } from '@/components/shared/NotificationBell'
+import { SITE_NAME } from '@/lib/site'
 
 interface SuperAdminHeaderProps {
   userName: string
 }
-
-const SITE_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? 'منصة الكاشير'
 
 export function SuperAdminHeader({ userName }: SuperAdminHeaderProps) {
   const { theme, toggle } = useTheme()

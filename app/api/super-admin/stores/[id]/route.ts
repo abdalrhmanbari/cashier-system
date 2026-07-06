@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 
 async function requireSuperAdmin(req: NextRequest) {
   const token = await getToken({
@@ -51,15 +52,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     if (before && before.maintenanceMode !== store.maintenanceMode) {
       const admin = await prisma.superAdmin.findUnique({ where: { id: token.id as string }, select: { name: true, email: true } })
-      await prisma.auditLog.create({
-        data: {
-          action:     store.maintenanceMode ? 'ENABLE_STORE_MAINTENANCE' : 'DISABLE_STORE_MAINTENANCE',
-          resource:   'STORE',
-          resourceId: store.id,
-          storeId:    store.id,
-          newData:    JSON.stringify({ adminName: admin?.name, adminEmail: admin?.email, message: store.maintenanceMessage }),
-        },
-      })
+      try {
+        await prisma.auditLog.create({
+          data: {
+            action:     store.maintenanceMode ? 'ENABLE_STORE_MAINTENANCE' : 'DISABLE_STORE_MAINTENANCE',
+            resource:   'STORE',
+            resourceId: store.id,
+            storeId:    store.id,
+            superAdminId: token.id as string,
+            newData:    JSON.stringify({ adminName: admin?.name, adminEmail: admin?.email, message: store.maintenanceMessage }),
+          },
+        })
+      } catch (e) {
+        logger.error('فشل تسجيل AuditLog', { action: 'STORE_MAINTENANCE_TOGGLE', storeId: store.id, err: (e as Error)?.message })
+      }
     }
 
     return NextResponse.json(store)

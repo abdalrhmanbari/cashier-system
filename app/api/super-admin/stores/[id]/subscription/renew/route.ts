@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { prisma } from '@/lib/prisma'
 import { renewalDuration, getSubscriptionDetail } from '@/lib/subscription'
+import { logger } from '@/lib/logger'
 
 async function requireSuperAdmin(req: NextRequest) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET, cookieName: 'super-admin.session-token' })
@@ -56,15 +57,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     })
 
     const admin = await prisma.superAdmin.findUnique({ where: { id: token.id as string }, select: { name: true, email: true } })
-    await prisma.auditLog.create({
-      data: {
-        action:     'RENEW_SUBSCRIPTION',
-        resource:   'SUBSCRIPTION',
-        resourceId: renewal.subscriptionId,
-        storeId:    params.id,
-        newData:    JSON.stringify({ adminName: admin?.name, adminEmail: admin?.email, toDate: renewal.toDate, priceUsd: renewal.priceUsd }),
-      },
-    })
+    try {
+      await prisma.auditLog.create({
+        data: {
+          action:     'RENEW_SUBSCRIPTION',
+          resource:   'SUBSCRIPTION',
+          resourceId: renewal.subscriptionId,
+          storeId:    params.id,
+          superAdminId: token.id as string,
+          newData:    JSON.stringify({ adminName: admin?.name, adminEmail: admin?.email, toDate: renewal.toDate, priceUsd: renewal.priceUsd }),
+        },
+      })
+    } catch (e) {
+      logger.error('فشل تسجيل AuditLog', { action: 'RENEW_SUBSCRIPTION', storeId: params.id, err: (e as Error)?.message })
+    }
 
     const subscription = await getSubscriptionDetail(params.id)
     return NextResponse.json(subscription)

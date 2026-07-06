@@ -20,9 +20,9 @@ export async function POST(req: NextRequest) {
   try {
     const t    = await requireStore(req)
     requireManager(t)
-    const { name, color } = await req.json()
+    const { name, color, imageUrl } = await req.json()
     const cat = await prisma.category.create({
-      data: { name, color: color ?? '#6366f1', storeId: t.storeId },
+      data: { name, color: color ?? '#6366f1', imageUrl: imageUrl || null, storeId: t.storeId },
     })
     return NextResponse.json(cat, { status: 201 })
   } catch (e) {
